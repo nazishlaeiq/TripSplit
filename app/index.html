@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TripSplit</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f6f7f4;--card:#fff;--tx:#1d2421;--mu:#69736e;--ac:#0f766e;--ac2:#e3f2ef;--bd:#dfe4e0;--rd:#c2410c;--gr:#15803d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121615;--card:#1b211f;--tx:#e8eeea;--mu:#93a09a;--ac:#2dd4bf;--ac2:#173330;--bd:#2b3431;--rd:#fb923c;--gr:#4ade80}}
+:root[data-theme="dark"]{--bg:#121615;--card:#1b211f;--tx:#e8eeea;--mu:#93a09a;--ac:#2dd4bf;--ac2:#173330;--bd:#2b3431;--rd:#fb923c;--gr:#4ade80}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{padding:12px 12px calc(84px + env(safe-area-inset-bottom,0px));max-width:820px;margin:auto}
+h1{font-size:20px;margin:6px 0 2px}h2{font-size:16px;margin:18px 0 8px}.mu{color:var(--mu);font-size:13px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:8px 0}
+.row{display:flex;gap:8px;align-items:center}.sp{justify-content:space-between}.r{text-align:right}
+button{background:var(--ac);color:#fff;border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:600}
+button.g{background:var(--ac2);color:var(--ac)}button.s{padding:5px 10px;font-size:13px}button.x{background:transparent;color:var(--rd);padding:5px 8px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit;margin:3px 0 8px}
+label{font-size:13px;color:var(--mu)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;color:var(--mu);border-radius:0;font-size:12px;padding:10px 0}nav button.on{color:var(--ac)}nav span{display:block;font-size:20px}
+.big{font-size:26px;font-weight:700}.pos{color:var(--gr)}.neg{color:var(--rd)}
+.bar{height:8px;background:var(--ac2);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+#m{display:none;position:fixed;inset:0;background:#0007;z-index:9;align-items:flex-end;justify-content:center}#m.show{display:flex}
+.sheet{background:var(--card);width:100%;max-width:640px;max-height:92%;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet h3{margin:0 0 10px}.chk{display:flex;gap:8px;align-items:center;padding:4px 0}.chk input{width:auto;margin:0}
+#t{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:#222;color:#fff;padding:8px 14px;border-radius:20px;display:none;z-index:10}
+.msg{white-space:pre-wrap;padding:8px 10px;border-radius:10px;margin:6px 0;max-width:92%}.mu2{background:var(--ac);color:#fff;margin-left:auto}.ma{background:var(--card);border:1px solid var(--bd)}.mt{color:var(--mu);font-size:12px;margin:2px 0}.me{color:var(--rd)}.tab{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:right}td:first-child,th:first-child{text-align:left}
+</style></head><body>
+<main id="app"></main>
+<nav id="nav"></nav><div id="m"></div><div id="t"></div>
+<script>
+const CATS=['Travel','Stay','Food','Snacks','Tickets','Rides','Shopping','Other'];
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=p=>(p<0?'-':'')+'₹'+(Math.abs(p)/100).toLocaleString('en-IN',{minimumFractionDigits:Math.abs(p)%100?2:0,maximumFractionDigits:2});
+let S=(()=>{try{return JSON.parse(localStorage.getItem('tripsplit1'))}catch(e){return null}})()||{name:'My Trip',fam:[],per:[],exp:[],del:[]};
+let tab='exp',filt='',view='p';
+const save=()=>{try{localStorage.setItem('tripsplit1',JSON.stringify(S))}catch(e){}};
+const toast=m=>{const t=$('#t');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2200)};
+const P=id=>S.per.find(p=>p.id===id),F=id=>S.fam.find(f=>f.id===id);
+const pn=id=>P(id)?P(id).name:'(removed)';
+const fk=p=>p.fam&&F(p.fam)?p.fam:p.id;
+const fname=k=>F(k)?F(k).name:pn(k);
+
+function shares(e){
+ const ps=e.parts.map(P).filter(Boolean);if(!ps.length)return{};
+ const c={};ps.forEach(p=>c[fk(p)]=(c[fk(p)]||0)+1);
+ const w=ps.map(p=>e.mode==='fam'?1/c[fk(p)]:e.mode==='wt'?p.w:1);
+ const tw=w.reduce((a,b)=>a+b,0)||1,raw=w.map(x=>e.amt*x/tw),fl=raw.map(Math.floor);
+ let rem=e.amt-fl.reduce((a,b)=>a+b,0);
+ const o=raw.map((r,i)=>[r-fl[i],i]).sort((a,b)=>b[0]-a[0]);
+ for(let k=0;rem>0;k++,rem--)fl[o[k%o.length][1]]++;
+ const r={};ps.forEach((p,i)=>r[p.id]=fl[i]);return r;
+}
+function calc(){
+ const paid={},owed={};S.per.forEach(p=>{paid[p.id]=0;owed[p.id]=0});
+ S.exp.forEach(e=>{if(paid[e.payer]!=null)paid[e.payer]+=e.amt;const s=shares(e);for(const k in s)owed[k]+=s[k]});
+ return{paid,owed};
+}
+function settle(bal){
+ const c=[],d=[];for(const k in bal){if(bal[k]>0)c.push([k,bal[k]]);else if(bal[k]<0)d.push([k,-bal[k]])}
+ const out=[];while(c.length&&d.length){c.sort((a,b)=>b[1]-a[1]);d.sort((a,b)=>b[1]-a[1]);
+  const m=Math.min(c[0][1],d[0][1]);out.push([d[0][0],c[0][0],m]);c[0][1]-=m;d[0][1]-=m;
+  if(!c[0][1])c.shift();if(!d[0][1])d.shift()}
+ return out;
+}
+
+function modal(title,body,ok,txt='Save'){
+ const m=$('#m');m.innerHTML=`<div class="sheet"><h3>${title}</h3>${body}<div class="row"><button class="g" style="flex:1" data-a="cm" data-x="">Cancel</button><button style="flex:1" id="ok">${txt}</button></div></div>`;
+ m.className='show';$('#ok').onclick=()=>{if(ok()!==false)cm()};
+}
+const cm=()=>$('#m').className='';
+const val=id=>$('#'+id).value.trim();
+
+function render(){
+ save();
+ const tabs=[['exp','🧾','Expenses'],['ppl','👨‍👩‍👧','People'],['sum','📊','Summary'],['ai','🤖','Assistant'],['sh','🔗','Share']];
+ $('#nav').innerHTML=tabs.map(t=>`<button class="${tab===t[0]?'on':''}" data-a="tab" data-x="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
+ $('#app').innerHTML=({exp:vExp,ppl:vPpl,sum:vSum,sh:vSh,ai:vAI})[tab]();
+ window.scrollTo(0,tab==='ai'?1e6:0);
+}
+
+/* ---------- People ---------- */
+function vPpl(){
+ const tot=S.per.length;
+ let h=`<h1>${esc(S.name)}</h1><div class="mu">${S.fam.length} families · ${tot} people</div>
+ <div class="row" style="margin:10px 0"><button class="s" data-a="famForm" data-x="">+ Family</button><button class="s" data-a="perForm" data-x="">+ Person</button></div>`;
+ const groups=[...S.fam.map(f=>[f,S.per.filter(p=>p.fam===f.id)]),[null,S.per.filter(p=>!p.fam||!F(p.fam))]];
+ groups.forEach(([f,m])=>{ if(!f&&!m.length)return;
+  h+=`<div class="card"><div class="row sp"><b>${f?esc(f.name):'No family'}</b>${f?`<span><button class="g s" data-a="famForm" data-x="${f.id}">Edit</button></span>`:''}</div>`;
+  h+=m.map(p=>`<div class="row sp" style="padding:6px 0;border-top:1px solid var(--bd)"><span>${esc(p.name)} <span class="mu">weight ${p.w}</span></span><span><button class="g s" data-a="perForm" data-x="${p.id}">Edit</button></span></div>`).join('')||'<div class="mu">No members yet</div>';
+  h+='</div>'});
+ if(!S.per.length)h+=`<div class="card mu">Start by adding a family, then add its members. Weight decides share in "by weight" splits: 1 = adult, 0.6 = child, 0.3 = under 5, 0 = free.</div>`;
+ return h;
+}
+function famForm(id){
+ const f=id?F(id):null;
+ modal(f?'Edit family':'New family',`<label>Family name</label><input id="fn" value="${esc(f?.name)}">`,()=>{
+  const n=val('fn');if(!n)return false;if(f)f.name=n;else S.fam.push({id:uid(),name:n});render()});
+ if(f)$('#m .sheet').insertAdjacentHTML('beforeend',`<button class="x" data-a="delFam" data-x="${id}">Delete family (members stay, without family)</button>`);
+}
+function delFam(id){S.fam=S.fam.filter(f=>f.id!==id);S.per.forEach(p=>{if(p.fam===id)p.fam=''});cm();render()}
+function perForm(id){
+ const p=id?P(id):null;
+ modal(p?'Edit person':'New person',`<label>Name</label><input id="pn" value="${esc(p?.name)}">
+ <label>Family</label><select id="pf"><option value="">No family</option>${S.fam.map(f=>`<option value="${f.id}" ${p?.fam===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select>
+ <label>Weight (1 adult · 0.6 child · 0.3 under 5)</label><input id="pw" type="number" step="0.1" min="0" value="${p?p.w:1}">`,()=>{
+  const n=val('pn');if(!n)return false;const w=parseFloat(val('pw'));
+  if(p){p.name=n;p.fam=val('pf');p.w=isNaN(w)?1:w}else S.per.push({id:uid(),name:n,fam:val('pf'),w:isNaN(w)?1:w});render()});
+ if(p)$('#m .sheet').insertAdjacentHTML('beforeend',`<button class="x" data-a="delPer" data-x="${id}">Delete person</button>`);
+}
+function delPer(id){
+ if(S.exp.some(e=>e.payer===id)){toast('Paid an expense: reassign it first');return}
+ S.per=S.per.filter(p=>p.id!==id);S.exp.forEach(e=>e.parts=e.parts.filter(x=>x!==id));cm();render();
+}
+
+/* ---------- Expenses ---------- */
+function vExp(){
+ let list=[...S.exp].sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts);
+ if(filt)list=list.filter(e=>e.payer===filt);
+ const tot=list.reduce((a,e)=>a+e.amt,0);
+ let h=`<h1>Expenses</h1><div class="row sp"><div><div class="big">${fmt(tot)}</div><div class="mu">${list.length} items${filt?' paid by '+esc(pn(filt)):''}</div></div><button data-a="expForm" data-x="">+ Add</button></div>
+ <select id="ff" data-ch="filt"><option value="">Everyone (paid by)</option>${S.per.map(p=>`<option value="${p.id}" ${filt===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>`;
+ if(!list.length)h+=`<div class="card mu">${S.per.length?'No expenses yet. Tap + Add.':'Add people first in the People tab.'}</div>`;
+ const md={eq:'equal per person',fam:'equal per family',wt:'by weight'};
+ h+=list.map(e=>`<div class="card" data-a="expForm" data-x="${e.id}"><div class="row sp"><b>${esc(e.title)}</b><b>${fmt(e.amt)}</b></div>
+ <div class="mu">${esc(e.cat)} · ${e.date} · paid by ${esc(pn(e.payer))}</div><div class="mu">Split: ${md[e.mode]}, ${e.parts.length} people</div>${e.note?`<div class="mu">${esc(e.note)}</div>`:''}</div>`).join('');
+ return h;
+}
+function expForm(id){
+ if(!S.per.length){toast('Add people first');return}
+ const e=id?S.exp.find(x=>x.id===id):null,sel=new Set(e?e.parts:S.per.map(p=>p.id));
+ const grp=[...S.fam.map(f=>[f.name,f.id]),['No family','']].map(([n,fid])=>{
+  const m=S.per.filter(p=>fid?p.fam===fid:(!p.fam||!F(p.fam)));if(!m.length)return'';
+  return`<div style="margin-top:6px"><div class="row sp"><b style="font-size:13px">${esc(n)}</b><button type="button" class="g s" data-a="tg" data-x="${fid}">toggle all</button></div>${m.map(p=>`<label class="chk"><input type="checkbox" class="pc" data-f="${fid}" value="${p.id}" ${sel.has(p.id)?'checked':''}>${esc(p.name)}</label>`).join('')}</div>`}).join('');
+ modal(e?'Edit expense':'New expense',`<label>What was it for?</label><input id="et" placeholder="e.g. Train tickets" value="${esc(e?.title)}">
+ <label>Amount (₹)</label><input id="ea" type="number" inputmode="decimal" value="${e?e.amt/100:''}">
+ <div class="row"><div style="flex:1"><label>Category</label><select id="ec">${CATS.map(c=>`<option ${e?.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+ <div style="flex:1"><label>Date</label><input id="ed" type="date" value="${e?.date||new Date().toISOString().slice(0,10)}"></div></div>
+ <label>Paid by</label><select id="ep">${S.per.map(p=>`<option value="${p.id}" ${e?.payer===p.id?'selected':''}>${esc(p.name)}${p.fam&&F(p.fam)?' ('+esc(F(p.fam).name)+')':''}</option>`).join('')}</select>
+ <label>Split method</label><select id="em"><option value="eq" ${e?.mode==='eq'?'selected':''}>Equal per person</option><option value="fam" ${e?.mode==='fam'?'selected':''}>Equal per family</option><option value="wt" ${e?.mode==='wt'?'selected':''}>By weight (adult 1, small kids less)</option></select>
+ <label>Shared by (untick people who did not use it)</label>${grp}<label style="margin-top:8px;display:block">Note (optional)</label><input id="en" value="${esc(e?.note)}">`,()=>{
+  const t=val('et'),a=Math.round(parseFloat(val('ea'))*100),parts=[...document.querySelectorAll('.pc:checked')].map(c=>c.value);
+  if(!t||!(a>0)){toast('Enter title and amount');return false}if(!parts.length){toast('Select who shares it');return false}
+  const o={id:e?e.id:uid(),title:t,amt:a,cat:val('ec'),date:val('ed'),payer:val('ep'),mode:val('em'),parts,note:val('en'),ts:Date.now()};
+  if(e)Object.assign(e,o);else S.exp.push(o);render()});
+ if(e)$('#m .sheet').insertAdjacentHTML('beforeend',`<button class="x" data-a="delExp" data-x="${id}">Delete expense</button>`);
+}
+function tg(f){const c=[...document.querySelectorAll('.pc')].filter(x=>x.dataset.f===f),on=c.some(x=>!x.checked);c.forEach(x=>x.checked=on)}
+function delExp(id){S.exp=S.exp.filter(e=>e.id!==id);S.del.push(id);cm();render()}
+
+/* ---------- Summary ---------- */
+function vSum(){
+ const{paid,owed}=calc(),tot=S.exp.reduce((a,e)=>a+e.amt,0),n=S.per.length||1;
+ let h=`<h1>Summary</h1><div class="card"><div class="mu">Total spent</div><div class="big">${fmt(tot)}</div><div class="mu">${S.exp.length} expenses · average ${fmt(Math.round(tot/n))} per person</div></div>`;
+ const cat={};S.exp.forEach(e=>cat[e.cat]=(cat[e.cat]||0)+e.amt);
+ h+=`<h2>Spent on what</h2><div class="card">`+(Object.entries(cat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div style="margin:6px 0"><div class="row sp"><span>${c}</span><b>${fmt(v)}</b></div><div class="bar"><i style="width:${tot?v/tot*100:0}%"></i></div></div>`).join('')||'<span class="mu">Nothing yet</span>')+`</div>`;
+ h+=`<h2>Who paid and who owes</h2><div class="row" style="margin-bottom:6px"><button class="${view==='p'?'':'g'} s" data-a="view" data-x="p">Per person</button><button class="${view==='f'?'':'g'} s" data-a="view" data-x="f">Per family</button></div>`;
+ let rows;
+ if(view==='p')rows=S.per.map(p=>[p.id,pn(p.id)+(p.fam&&F(p.fam)?' · '+F(p.fam).name:''),paid[p.id],owed[p.id]]);
+ else{const m={};S.per.forEach(p=>{const k=fk(p);m[k]=m[k]||[k,fname(k),0,0];m[k][2]+=paid[p.id];m[k][3]+=owed[p.id]});rows=Object.values(m)}
+ h+=`<div class="card tab"><table><tr><th></th><th>Paid</th><th>Share</th><th>Balance</th></tr>${rows.map(r=>{const b=r[2]-r[3];return`<tr><td>${esc(r[1])}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td class="${b>=0?'pos':'neg'}"><b>${fmt(b)}</b></td></tr>`}).join('')}</table></div>
+ <div class="mu">Positive balance = should receive. Negative = should pay.</div>`;
+ const bal={};rows.forEach(r=>bal[r[0]]=r[2]-r[3]);
+ const nm=k=>view==='p'?pn(k):fname(k);
+ const st=settle(bal);
+ h+=`<h2>Settle up</h2>`+(st.length?st.map(([a,b,m])=>`<div class="card row sp"><span><b>${esc(nm(a))}</b> pays <b>${esc(nm(b))}</b></span><b>${fmt(m)}</b></div>`).join(''):'<div class="card mu">All settled 🎉</div>');
+ const per=S.per.map(p=>{const items=S.exp.filter(e=>e.payer===p.id);return items.length?`<div class="card"><b>${esc(p.name)}</b> paid ${fmt(paid[p.id])}<div class="mu">${items.map(e=>esc(e.title)+' '+fmt(e.amt)).join(' · ')}</div></div>`:''}).join('');
+ return h+`<h2>Who spent on what</h2>`+(per||'<div class="card mu">Nothing yet</div>');
+}
+
+/* ---------- Share ---------- */
+function summaryText(){
+ const{paid,owed}=calc(),tot=S.exp.reduce((a,e)=>a+e.amt,0);
+ let t=`${S.name}\nTotal: ${fmt(tot)}\n\n`;
+ t+=S.exp.map(e=>`${e.date} ${e.title} ${fmt(e.amt)} (paid by ${pn(e.payer)})`).join('\n');
+ t+='\n\nBalances:\n'+S.per.map(p=>`${p.name}: paid ${fmt(paid[p.id])}, share ${fmt(owed[p.id])}, balance ${fmt(paid[p.id]-owed[p.id])}`).join('\n');
+ const b={};S.per.forEach(p=>b[p.id]=paid[p.id]-owed[p.id]);
+ t+='\n\nSettle up:\n'+(settle(b).map(([a,c,m])=>`${pn(a)} pays ${pn(c)} ${fmt(m)}`).join('\n')||'All settled');return t;
+}
+function vSh(){
+ return`<h1>Share & backup</h1>
+ <div class="card"><label>Trip name</label><input id="tn" value="${esc(S.name)}" data-ch="tname"></div>
+ <div class="card"><b>Sync with the group</b><div class="mu" style="margin:4px 0 8px">Everyone installs the app and enters expenses on their own phone. Copy your trip code, send it on WhatsApp, and others tap "Import code" to merge. New and edited expenses combine; nothing is lost.</div>
+ <div class="row"><button class="s" data-a="copyCode" data-x="">Copy trip code</button><button class="g s" data-a="impForm" data-x="">Import code</button></div></div>
+ <div class="card"><b>Send results</b><div class="mu" style="margin:4px 0 8px">Text summary with all expenses, balances and who pays whom.</div><div class="row"><button class="s" data-a="shareTxt" data-x="">Share / copy summary</button><button class="g s" data-a="csv" data-x="">Copy as CSV</button></div></div>
+ <div class="card"><b>Start over</b><div class="mu" style="margin:4px 0 8px">Erases everything on this phone.</div><button class="x" data-a="reset">Reset all data</button></div>`;
+}
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s.trim()))));
+async function cp(t,m){try{await navigator.clipboard.writeText(t);toast(m)}catch(e){modal('Copy manually',`<textarea rows="8" readonly>${esc(t)}</textarea>`,()=>{},'Done')}}
+const copyCode=()=>cp('TRIPSPLIT:'+enc(S),'Trip code copied');
+function shareTxt(){const t=summaryText();if(navigator.share)navigator.share({text:t}).catch(()=>{});else cp(t,'Summary copied')}
+function csv(){cp('Date,Title,Category,Amount,Paid by,Split\n'+S.exp.map(e=>[e.date,e.title,e.cat,e.amt/100,pn(e.payer),e.mode].map(x=>`"${x}"`).join(',')).join('\n'),'CSV copied')}
+function impForm(){
+ modal('Import trip code',`<textarea id="ic" rows="6" placeholder="Paste code here"></textarea>`,()=>{
+  try{const o=dec(val('ic').replace('TRIPSPLIT:',''));
+   (o.del||[]).forEach(id=>{S.exp=S.exp.filter(e=>e.id!==id);if(!S.del.includes(id))S.del.push(id)});
+   o.fam.forEach(f=>{const x=F(f.id);if(x)x.name=f.name;else S.fam.push(f)});
+   o.per.forEach(p=>{const x=P(p.id);if(x)Object.assign(x,p);else S.per.push(p)});
+   o.exp.forEach(e=>{if(S.del.includes(e.id))return;const x=S.exp.find(y=>y.id===e.id);if(!x)S.exp.push(e);else if((e.ts||0)>(x.ts||0))Object.assign(x,e)});
+   if(S.name==='My Trip')S.name=o.name;toast('Imported');render()}catch(e){toast('Invalid code');return false}},'Import');
+}
+/* ---------- Claude AI assistant ---------- */
+let chat=[],msgs=[],busy=false;
+const lsg=k=>{try{return localStorage.getItem(k)||''}catch(e){return''}};
+function vAI(){
+ return`<h1>AI Assistant</h1><div class="mu">Tell it what to do in plain words, e.g. "Add Family 4 with Sana and Omar" or "Alice paid 5500 for the taxi, split among the 3 of us".</div>
+ <div class="card"><div class="row sp"><b>Settings</b><button class="g s" data-a="ks">${lsg('ts_key')?'API key saved ✓':'Add API key'}</button></div>
+ <div id="ks" style="display:${lsg('ts_key')?'none':'block'};margin-top:8px"><label>Claude API key (from console.anthropic.com, stored only on this computer)</label><input id="ak" type="password" placeholder="sk-ant-..." value="${esc(lsg('ts_key'))}">
+ <label>Model</label><input id="am" value="${esc(lsg('ts_model')||'claude-sonnet-5')}"><button class="s" data-a="saveKey">Save</button></div></div>
+ ${chat.map(m=>`<div class="${m.r==='t'?'mt':'msg '+({u:'mu2',a:'ma',e:'me ma'})[m.r]}">${esc(m.t)}</div>`).join('')}
+ ${busy?'<div class="mt">Working…</div>':''}
+ <div class="row" style="align-items:flex-end;margin-top:10px"><textarea id="aq" rows="2" placeholder="What should I do?"></textarea><button data-a="send" data-x="" ${busy?'disabled':''}>Send</button></div>
+ <button class="g s" data-a="clearChat">Clear chat</button>`;
+}
+const TOOLS=[
+{name:'add_family',description:'Add a family group.',input_schema:{type:'object',properties:{name:{type:'string'}},required:['name']}},
+{name:'add_person',description:'Add a person. weight: adult or child 11+ =1, child 5-11 =0.6, under 5 =0.3.',input_schema:{type:'object',properties:{name:{type:'string'},family:{type:'string',description:'family name, optional'},weight:{type:'number'}},required:['name']}},
+{name:'add_expense',description:'Record an expense. participants = person names who share it, or ["ALL"]. mode: eq equal per person, fam equal per family, wt by weight.',input_schema:{type:'object',properties:{title:{type:'string'},amount:{type:'number',description:'rupees'},category:{type:'string',enum:CATS},payer:{type:'string'},participants:{type:'array',items:{type:'string'}},mode:{type:'string',enum:['eq','fam','wt']},date:{type:'string',description:'YYYY-MM-DD, default today'},note:{type:'string'}},required:['title','amount','payer','participants','mode']}},
+{name:'delete_expense',description:'Delete an expense by its title.',input_schema:{type:'object',properties:{title:{type:'string'}},required:['title']}},
+{name:'rename',description:'Rename a person or a family.',input_schema:{type:'object',properties:{old_name:{type:'string'},new_name:{type:'string'}},required:['old_name','new_name']}},
+{name:'get_summary',description:'Get all expenses, balances and who pays whom. Use for any question about totals or balances.',input_schema:{type:'object',properties:{}}}];
+const lc=x=>String(x||'').trim().toLowerCase();
+function findP(n){const a=S.per.filter(p=>lc(p.name)===lc(n));if(a.length===1)return a[0];const b=S.per.filter(p=>lc(p.name).includes(lc(n)));return b.length===1?b[0]:null}
+function findF(n){return S.fam.find(f=>lc(f.name)===lc(n))||S.fam.find(f=>lc(f.name).includes(lc(n)))}
+function runTool(n,i){
+ try{
+ if(n==='add_family'){if(findF(i.name))return'Family already exists';S.fam.push({id:uid(),name:i.name});return'Added family '+i.name}
+ if(n==='add_person'){let f='';if(i.family){const x=findF(i.family)||(S.fam.push({id:uid(),name:i.family}),S.fam[S.fam.length-1]);f=x.id}
+  S.per.push({id:uid(),name:i.name,fam:f,w:i.weight??1});return'Added '+i.name}
+ if(n==='add_expense'){const py=findP(i.payer);if(!py)return'Unknown payer "'+i.payer+'". People: '+S.per.map(p=>p.name).join(', ');
+  let parts=[];if((i.participants||[]).some(x=>lc(x)==='all'))parts=S.per.map(p=>p.id);else for(const x of i.participants||[]){const q=findP(x);if(!q)return'Unknown person "'+x+'". People: '+S.per.map(p=>p.name).join(', ');parts.push(q.id)}
+  if(!parts.length||!(i.amount>0))return'Need participants and a positive amount';
+  S.exp.push({id:uid(),title:i.title,amt:Math.round(i.amount*100),cat:CATS.includes(i.category)?i.category:'Other',date:i.date||new Date().toISOString().slice(0,10),payer:py.id,mode:i.mode||'eq',parts,note:i.note||'',ts:Date.now()});return'Recorded '+i.title+' '+fmt(Math.round(i.amount*100))}
+ if(n==='delete_expense'){const e=S.exp.find(x=>lc(x.title)===lc(i.title))||S.exp.find(x=>lc(x.title).includes(lc(i.title)));if(!e)return'No such expense';S.exp=S.exp.filter(x=>x!==e);S.del.push(e.id);return'Deleted '+e.title}
+ if(n==='rename'){const p=findP(i.old_name),f=p?null:findF(i.old_name);if(p)p.name=i.new_name;else if(f)f.name=i.new_name;else return'Not found';return'Renamed'}
+ if(n==='get_summary')return summaryText();
+ }catch(e){return'Error: '+e.message}
+ return'Unknown tool';
+}
+const sys=()=>`You are the assistant inside TripSplit, a trip expense-splitting app for families. Do what the user asks by calling tools; never do arithmetic yourself, use get_summary for totals and balances. Amounts are in Indian rupees. Today is ${new Date().toISOString().slice(0,10)}. Reply briefly. Families: ${JSON.stringify(S.fam.map(f=>f.name))}. People: ${JSON.stringify(S.per.map(p=>({name:p.name,family:F(p.fam)?.name||null,weight:p.w})))}. Expenses so far: ${JSON.stringify(S.exp.map(e=>e.title+' '+e.amt/100))}.`;
+async function claudeCall(body){
+ const key=lsg('ts_key');if(!key)throw new Error('Add your API key first (Settings above).');
+ if(window.desk)return window.desk.claude(key,body);
+ const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});
+ const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'HTTP '+r.status);return j;
+}
+async function send(){
+ const q=$('#aq');const text=q&&q.value.trim();if(!text||busy)return;
+ chat.push({r:'u',t:text});msgs.push({role:'user',content:text});busy=true;render();
+ try{for(let i=0;i<8;i++){
+  const j=await claudeCall({model:lsg('ts_model')||'claude-sonnet-5',max_tokens:1500,system:sys(),tools:TOOLS,messages:msgs});
+  msgs.push({role:'assistant',content:j.content});
+  const tx=j.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');if(tx)chat.push({r:'a',t:tx});
+  const tu=j.content.filter(b=>b.type==='tool_use');if(!tu.length)break;
+  const res=tu.map(b=>{const o=runTool(b.name,b.input||{});chat.push({r:'t',t:'⚙ '+o.split('\n')[0].slice(0,90)});return{type:'tool_result',tool_use_id:b.id,content:o}});
+  msgs.push({role:'user',content:res});
+ }}catch(e){chat.push({r:'e',t:e.message});msgs=[]}
+ busy=false;render();
+}
+const A={famForm:x=>famForm(x),perForm:x=>perForm(x),expForm:x=>expForm(x),cm:x=>cm(x),delFam:x=>delFam(x),delPer:x=>delPer(x),delExp:x=>delExp(x),tg:x=>tg(x),copyCode:x=>copyCode(x),impForm:x=>impForm(x),shareTxt:x=>shareTxt(x),csv:x=>csv(x),send:x=>send(x),tab:x=>{tab=x;render()},view:x=>{view=x;render()},reset:()=>{if(confirm('Erase all data?')){S={name:'My Trip',fam:[],per:[],exp:[],del:[]};render()}},ks:()=>{const k=$('#ks');k.style.display=k.style.display==='none'?'block':'none'},saveKey:()=>{try{localStorage.setItem('ts_key',val('ak'));localStorage.setItem('ts_model',val('am')||'claude-sonnet-5')}catch(e){}toast('Saved');render()},clearChat:()=>{chat=[];msgs=[];render()}};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a])A[b.dataset.a](b.dataset.x||'')});
+document.addEventListener('change',e=>{const c=e.target.dataset&&e.target.dataset.ch;if(c==='filt'){filt=e.target.value;render()}else if(c==='tname'){S.name=e.target.value;save()}});
+document.addEventListener('focusin',e=>{if(e.target.matches&&e.target.matches('textarea[readonly]'))e.target.select()});
+document.addEventListener('keydown',e=>{if(e.target.id==='aq'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
